@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DocKeep — Smart Document Keeper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { font-family: 'Nunito', sans-serif; box-sizing: border-box; }
+  body { background: #d1d5db; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px 0; }
+  .phone-frame { position: relative; width: 390px; height: 844px; background: #f5f5f7; border-radius: 48px; border: 8px solid #1a1a1a; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.35); }
+  .screen { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
+  .screen.active { display: flex; }
+  .scroll-area { flex: 1; overflow-y: auto; }
+  .scroll-area::-webkit-scrollbar, .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .folder-unsorted   { background: #6ee7b7; }
+  .folder-warranties { background: #7dd3fc; }
+  .folder-receipts   { background: #f0abfc; }
+  .folder-invoices   { background: #fcd34d; }
+  .folder-ids        { background: #c4b5fd; }
+  .folder-insurance  { background: #fde047; }
+  .folder-techspecs  { background: #93c5fd; }
+  .folder-manuals    { background: #5eead4; }
+  .tab-unsorted   { background: #a7f3d0; }
+  .tab-warranties { background: #7dd3fc; }
+  .tab-receipts   { background: #f9a8d4; }
+  .tab-invoices   { background: #fcd34d; }
+  .tab-ids        { background: #c4b5fd; }
+  .tab-insurance  { background: #fde047; }
+  .tab-techspecs  { background: #a5b4fc; }
+  .tab-manuals    { background: #5eead4; }
+  .btn-press:active { transform: scale(0.96); }
+  button { cursor: pointer; border: none; background: none; outline: none; }
+  .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px; border-radius: 16px; transition: all 0.2s; }
+  .nav-btn.active .nav-icon { color: #10b981; }
+  .nav-btn.active .nav-label { color: #10b981; }
+  .nav-icon { color: #9ca3af; display: flex; align-items: center; justify-content: center; }
+  .nav-label { font-size: 10px; font-weight: 700; color: #9ca3af; }
+  .scan-btn { background: #14b8a6; color: white; width: 56px; height: 56px; border-radius: 18px; margin-top: -20px; box-shadow: 0 8px 24px rgba(20,184,166,0.4); display: flex; align-items: center; justify-content: center; }
+  .chip { flex-shrink: 0; padding: 7px 16px; border-radius: 999px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; background: white; color: #374151; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .chip.active { background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16,185,129,0.35); }
+  input:focus { outline: none; }
+  input::placeholder { color: #9ca3af; }
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div class="phone-frame">
+
+  <!-- STATUS BAR -->
+  <div style="height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;">
+    <span style="font-size:12px;font-weight:800;color:#111;">9:41</span>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <svg width="16" height="10" viewBox="0 0 16 10"><rect x="0" y="0" width="13" height="9" rx="2" fill="none" stroke="#111" stroke-width="1.5"/><rect x="13" y="2.5" width="2" height="4" rx="1" fill="#111"/><rect x="1.5" y="1.5" width="8" height="6" rx="1" fill="#111"/></svg>
+      <svg width="14" height="11" viewBox="0 0 14 11"><rect x="0" y="5" width="2" height="6" rx="1" fill="#111"/><rect x="3" y="3" width="2" height="8" rx="1" fill="#111"/><rect x="6" y="1" width="2" height="10" rx="1" fill="#111"/><rect x="9" y="0" width="2" height="11" rx="1" fill="#111"/></svg>
+    </div>
+  </div>
+
+  <!-- SCREEN: SIGN IN -->
+  <div id="screen-signin" class="screen active scroll-area" style="padding:40px 28px 40px;justify-content:center;">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:28px;">
+      <div style="width:88px;height:88px;border-radius:26px;background:#0f766e;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(15,118,110,0.35);">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#5eead4"/><rect x="6.5" y="7" width="8" height="2.4" rx="1.2" fill="#0f766e"/><rect x="6.5" y="11" width="11" height="2.4" rx="1.2" fill="#ffffff"/><rect x="6.5" y="15" width="9" height="2.4" rx="1.2" fill="#ffffff"/></svg>
+      </div>
+      <div style="text-align:center;">
+        <h1 style="font-size:24px;font-weight:900;color:#111;margin:0 0 8px;">Welcome to DocKeep</h1>
+        <div style="font-size:13px;color:#6b7280;line-height:1.5;max-width:260px;">Sign in to sync and view your saved documents across devices.</div>
+      </div>
+      <button class="btn-press" onclick="startGoogleSignIn()" style="width:100%;background:white;border-radius:16px;padding:14px 18px;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.1);border:1.5px solid #e5e7eb;">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18c-.44-1.32-.69-2.73-.69-4.18s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+        <span style="font-size:14px;font-weight:700;color:#374151;">Sign in with Google</span>
+      </button>
+      <div id="signin-status" style="font-size:11px;color:#9ca3af;text-align:center;min-height:14px;"></div>
+      <div style="font-size:11px;color:#9ca3af;text-align:center;max-width:260px;">By continuing, you agree DocKeep can read and save documents to a folder in your Google Drive.</div>
+    </div>
+  </div>
+
+  <!-- SCREEN: SIGN IN - ACCOUNT PICKER -->
+  <div id="screen-signin-account-picker" class="screen scroll-area" style="padding:24px 20px;justify-content:center;">
+    <div style="background:white;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.15);overflow:hidden;">
+      <div style="padding:20px 20px 12px;text-align:center;">
+        <svg width="28" height="28" viewBox="0 0 48 48" style="margin-bottom:8px;"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18c-.44-1.32-.69-2.73-.69-4.18s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+        <div style="font-size:16px;font-weight:800;color:#111;">Choose an account</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px;">to continue to DocKeep</div>
+      </div>
+      <div style="border-top:1px solid #f3f4f6;">
+        <button class="btn-press" onclick="completeSignIn('Antony Jacob','antony@gmail.com','AJ')" style="width:100%;padding:14px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f3f4f6;">
+          <div style="width:38px;height:38px;border-radius:50%;background:#0f766e;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">AJ</div>
+          <div style="text-align:left;"><div style="font-size:13px;font-weight:700;color:#111;">Antony Jacob</div><div style="font-size:11px;color:#9ca3af;">antony@gmail.com</div></div>
+        </button>
+        <button class="btn-press" onclick="showScreen('signin')" style="width:100%;padding:14px 20px;display:flex;align-items:center;gap:12px;">
+          <div style="width:38px;height:38px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></div>
+          <div style="font-size:13px;font-weight:700;color:#374151;">Use another account</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: HOME -->
+  <div id="screen-home" class="screen scroll-area" style="padding:16px 20px 80px;gap:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:42px;height:42px;border-radius:50%;background:#14b8a6;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:13px;box-shadow:0 4px 12px rgba(20,184,166,0.3);"><span class="user-initials">AJ</span></div>
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;">Good Morning 👋</div>
+          <div style="font-size:13px;font-weight:800;color:#111;" class="user-name">Antony Jacob</div>
+        </div>
+      </div>
+      <button class="btn-press" style="width:42px;height:42px;border-radius:14px;background:white;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);position:relative;">
+        <svg width="18" height="18" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span style="position:absolute;top:8px;right:9px;width:8px;height:8px;background:#f87171;border-radius:50%;border:2px solid white;"></span>
+      </button>
+    </div>
+    <div style="margin-bottom:4px;">
+      <h1 style="font-size:24px;font-weight:900;color:#111;line-height:1.25;margin:0;">Keep everything<br/>important in one place.</h1>
+    </div>
+    <button class="btn-press" onclick="showScreen('search')" style="width:100%;background:#14b8a6;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(20,184,166,0.35);">
+      <svg width="18" height="18" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <span style="color:rgba(255,255,255,0.85);font-size:14px;font-weight:600;">Search your documents…</span>
+    </button>
+    <div style="background:#7c69ef;border-radius:28px;padding:20px;color:white;box-shadow:0 8px 30px rgba(99,102,241,0.35);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:10px;font-weight:700;opacity:0.75;text-transform:uppercase;letter-spacing:0.08em;">Your Documents</div>
+          <div style="font-size:36px;font-weight:900;line-height:1;margin:6px 0 2px;">128</div>
+          <div style="font-size:13px;opacity:0.8;">Documents secured</div>
+        </div>
+        <div style="font-size:40px;">🗄️</div>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;opacity:0.75;margin-bottom:6px;"><span>2.4 GB used</span><span>5 GB total</span></div>
+        <div style="background:rgba(255,255,255,0.2);border-radius:999px;height:8px;">
+          <div style="background:white;border-radius:999px;height:8px;width:48%;"></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:15px;font-weight:800;color:#111;">Quick Access</div>
+        <button onclick="showScreen('documents')" style="font-size:12px;font-weight:700;color:#10b981;">See all</button>
+      </div>
+      <div class="scrollbar-hide" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;">
+        <button class="btn-press" onclick="showScreen('folder-detail')"><div class="folder-unsorted" style="border-radius:18px;padding:12px 14px;min-width:88px;"><div style="font-size:20px;margin-bottom:6px;">📂</div><div style="font-size:11px;font-weight:800;color:#111;">Unsorted</div><div style="font-size:10px;color:#374151;">14 files</div></div></button>
+        <button class="btn-press" onclick="showScreen('folder-detail')"><div class="folder-warranties" style="border-radius:18px;padding:12px 14px;min-width:88px;"><div style="font-size:20px;margin-bottom:6px;">🔖</div><div style="font-size:11px;font-weight:800;color:#111;">Warranties</div><div style="font-size:10px;color:#374151;">24 files</div></div></button>
+        <button class="btn-press" onclick="showScreen('folder-detail')"><div class="folder-receipts" style="border-radius:18px;padding:12px 14px;min-width:88px;"><div style="font-size:20px;margin-bottom:6px;">🧾</div><div style="font-size:11px;font-weight:800;color:#111;">Receipts</div><div style="font-size:10px;color:#374151;">31 files</div></div></button>
+        <button class="btn-press" onclick="showScreen('folder-detail')"><div class="folder-invoices" style="border-radius:18px;padding:12px 14px;min-width:88px;"><div style="font-size:20px;margin-bottom:6px;">📑</div><div style="font-size:11px;font-weight:800;color:#111;">Invoices</div><div style="font-size:10px;color:#374151;">18 files</div></div></button>
+        <button class="btn-press" onclick="showScreen('folder-detail')"><div class="folder-ids" style="border-radius:18px;padding:12px 14px;min-width:88px;"><div style="font-size:20px;margin-bottom:6px;">🪪</div><div style="font-size:11px;font-weight:800;color:#111;">IDs &amp; Certs</div><div style="font-size:10px;color:#374151;">9 files</div></div></button>
+      </div>
+    </div>
+    <div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:15px;font-weight:800;color:#111;">Recent Documents</div>
+        <button style="font-size:12px;font-weight:700;color:#10b981;">See all</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#bae6fd;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">💻</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">MacBook Warranty</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">Warranties · 12 Jul 2025</div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+        <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#fde047;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">⚡</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">Electricity Bill</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">Receipts · 10 Jul 2025</div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+        <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#c4b5fd;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🛂</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">Passport Copy</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">IDs &amp; Certs · 8 Jul 2025</div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+        <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#fcd34d;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🏍️</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">Bike Insurance</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">Insurance · 5 Jul 2025</div></div><span style="background:#fed7aa;color:#ea580c;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;flex-shrink:0;">Expiring</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: DOCUMENTS -->
+  <div id="screen-documents" class="screen scroll-area" style="padding:20px 20px 80px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h1 style="font-size:24px;font-weight:900;color:#111;margin:0;">Documents</h1>
+      <button style="font-size:13px;font-weight:700;color:#10b981;">Select</button>
+    </div>
+    <div style="background:white;border-radius:18px;display:flex;align-items:center;gap:10px;padding:12px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:20px;">
+      <svg width="16" height="16" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search folders…" style="flex:1;font-size:13px;border:none;background:transparent;color:#374151;" />
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <button class="btn-press" onclick="showScreen('add-document')" style="border:2.5px dashed #6ee7b7;border-radius:28px;height:144px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:transparent;">
+        <div style="width:44px;height:44px;background:#14b8a6;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(20,184,166,0.35);"><svg width="20" height="20" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+        <div style="font-size:13px;font-weight:800;color:#10b981;">Add new</div>
+        <div style="font-size:11px;color:#9ca3af;">Tap to get started</div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-unsorted" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-unsorted" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">📂</div><div><div style="font-size:13px;font-weight:800;color:#111;">Unsorted</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 14</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-warranties" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-warranties" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">🔖</div><div><div style="font-size:13px;font-weight:800;color:#111;">Warranties</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 24</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-receipts" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-receipts" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">🧾</div><div><div style="font-size:13px;font-weight:800;color:#111;">Receipts</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 31</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-invoices" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-invoices" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">📑</div><div><div style="font-size:13px;font-weight:800;color:#111;">Invoices</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 18</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-ids" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-ids" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">🪪</div><div><div style="font-size:13px;font-weight:800;color:#111;">IDs &amp; Certs</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 9</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-insurance" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-insurance" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">🛡️</div><div><div style="font-size:13px;font-weight:800;color:#111;">Insurance</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 7</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-techspecs" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-techspecs" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">⚙️</div><div><div style="font-size:13px;font-weight:800;color:#111;">Tech Specs</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 12</div></div></div>
+      </button>
+      <button class="btn-press" onclick="showScreen('folder-detail')" style="border-radius:28px;overflow:hidden;height:144px;position:relative;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,0.09);">
+        <div class="tab-manuals" style="height:16px;width:55%;position:absolute;top:0;left:14px;border-radius:8px 8px 0 0;"></div>
+        <div class="folder-manuals" style="position:absolute;inset:0;padding:22px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:26px;margin-top:4px;">📘</div><div><div style="font-size:13px;font-weight:800;color:#111;">Manuals</div><div style="font-size:11px;color:#374151;margin-top:2px;">Files: 13</div></div></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN: FOLDER DETAIL -->
+  <div id="screen-folder-detail" class="screen" style="flex-direction:column;">
+    <div class="folder-warranties" style="padding:20px 20px 24px;flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <button onclick="showScreen('documents')" style="display:flex;align-items:center;gap:4px;color:#0284c7;font-size:13px;font-weight:700;"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg> Back</button>
+        <svg width="20" height="20" fill="none" stroke="#374151" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#374151"/><circle cx="12" cy="12" r="1" fill="#374151"/><circle cx="19" cy="12" r="1" fill="#374151"/></svg>
+      </div>
+      <h1 style="font-size:26px;font-weight:900;color:#111;margin:0 0 4px;">Warranties</h1>
+      <div style="font-size:13px;color:#374151;">24 Documents</div>
+    </div>
+    <div class="scrollbar-hide" style="display:flex;gap:8px;padding:16px 20px 0;overflow-x:auto;flex-shrink:0;" id="folder-filters">
+      <button class="chip active" onclick="setFilter(this)">All</button>
+      <button class="chip" onclick="setFilter(this)">Active</button>
+      <button class="chip" onclick="setFilter(this)">Expiring Soon</button>
+      <button class="chip" onclick="setFilter(this)">Expired</button>
+    </div>
+    <div class="scroll-area" style="padding:12px 20px 80px;display:flex;flex-direction:column;gap:10px;">
+      <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#bae6fd;border-radius:14px;font-size:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">💻</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">Apple MacBook Warranty</div><div style="font-size:11px;color:#9ca3af;">Apple Inc. · Jan 2024</div><div style="display:flex;gap:6px;margin-top:5px;align-items:center;"><span style="background:#a7f3d0;color:#059669;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;">Active</span><span style="font-size:10px;color:#9ca3af;">Expires Feb 2026</span></div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+      <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#bae6fd;border-radius:14px;font-size:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📺</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">Samsung TV Warranty</div><div style="font-size:11px;color:#9ca3af;">Samsung · Mar 2023</div><div style="display:flex;gap:6px;margin-top:5px;align-items:center;"><span style="background:#fed7aa;color:#ea580c;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;">Expiring</span><span style="font-size:10px;color:#9ca3af;">32 days left</span></div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+      <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#bae6fd;border-radius:14px;font-size:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🔋</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">Bike Battery Warranty</div><div style="font-size:11px;color:#9ca3af;">Bosch · Jun 2022</div><div style="display:flex;gap:6px;margin-top:5px;"><span style="background:#fecaca;color:#ef4444;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;">Expired</span></div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+      <button class="btn-press" onclick="showScreen('doc-detail')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:#bae6fd;border-radius:14px;font-size:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📱</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">iPhone 14 Pro</div><div style="font-size:11px;color:#9ca3af;">Apple Inc. · Sep 2023</div><div style="display:flex;gap:6px;margin-top:5px;align-items:center;"><span style="background:#fed7aa;color:#ea580c;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;">Expiring</span><span style="font-size:10px;color:#9ca3af;">65 days left</span></div></div><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#d1d5db"/><circle cx="12" cy="12" r="1" fill="#d1d5db"/><circle cx="19" cy="12" r="1" fill="#d1d5db"/></svg></button>
+    </div>
+    <div style="position:absolute;bottom:80px;right:20px;">
+      <button class="btn-press" onclick="showScreen('add-document')" style="background:#14b8a6;color:white;padding:13px 20px;border-radius:18px;font-size:13px;font-weight:800;box-shadow:0 6px 20px rgba(20,184,166,0.4);display:flex;align-items:center;gap:8px;"><svg width="18" height="18" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add Document</button>
+    </div>
+  </div>
+
+  <!-- SCREEN: ADD DOCUMENT -->
+  <div id="screen-add-document" class="screen scroll-area" style="padding:20px 20px 80px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <button onclick="showScreen('documents')" class="btn-press" style="width:42px;height:42px;background:white;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><svg width="20" height="20" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></button>
+      <h1 style="font-size:24px;font-weight:900;color:#111;margin:0;">Add Document</h1>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+      <button class="btn-press" style="background:#a7f3d0;border-radius:24px;padding:20px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,0.07);"><svg width="32" height="32" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg><div style="font-size:12px;font-weight:800;color:#111;text-align:center;">Scan Document</div></button>
+      <button class="btn-press" onclick="document.getElementById('drive-file-input').click()" style="background:#bae6fd;border-radius:24px;padding:20px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,0.07);"><svg width="32" height="32" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div style="font-size:12px;font-weight:800;color:#111;text-align:center;">Upload File</div></button>
+      <input type="file" id="drive-file-input" style="display:none;" onchange="handleFileChosen(this.files[0])" />
+      <button class="btn-press" style="background:#f9a8d4;border-radius:24px;padding:20px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,0.07);"><svg width="32" height="32" fill="none" stroke="#db2777" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><div style="font-size:12px;font-weight:800;color:#111;text-align:center;">Take Photo</div></button>
+      <button class="btn-press" style="background:#c4b5fd;border-radius:24px;padding:20px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,0.07);"><svg width="32" height="32" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><div style="font-size:12px;font-weight:800;color:#111;text-align:center;">Import from Gallery</div></button>
+    </div>
+    <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:12px;">Choose Category</div>
+    <div class="scrollbar-hide" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:20px;">
+      <button class="chip active">Warranties</button><button class="chip">Receipts</button><button class="chip">Invoices</button><button class="chip">IDs &amp; Certs</button><button class="chip">Insurance</button><button class="chip">Tech Specs</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+      <div style="background:white;border-radius:18px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:4px;">DOCUMENT TITLE *</div><input type="text" id="doc-title-input" placeholder="e.g. MacBook Warranty" style="width:100%;font-size:14px;font-weight:700;color:#111;border:none;background:transparent;" /></div>
+      <div id="chosen-file-chip" style="display:none;background:#ccfbf1;border-radius:14px;padding:10px 14px;font-size:12px;font-weight:700;color:#0f766e;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:white;border-radius:18px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:4px;">ISSUE DATE</div><div style="font-size:13px;color:#9ca3af;">DD / MM / YYYY</div></div>
+        <div style="background:white;border-radius:18px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:4px;">EXPIRY DATE</div><div style="font-size:13px;color:#9ca3af;">DD / MM / YYYY</div></div>
+      </div>
+      <div style="background:white;border-radius:18px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:4px;">NOTES</div><input type="text" placeholder="Add a note…" style="width:100%;font-size:13px;color:#374151;border:none;background:transparent;" /></div>
+    </div>
+    <button class="btn-press" onclick="saveDocumentToDrive()" style="width:100%;background:#14b8a6;color:white;font-size:16px;font-weight:800;padding:17px;border-radius:20px;box-shadow:0 8px 24px rgba(20,184,166,0.4);">Save Document</button>
+  </div>
+
+  <!-- SCREEN: DOC DETAIL -->
+  <div id="screen-doc-detail" class="screen scroll-area" style="padding-bottom:80px;">
+    <div class="folder-warranties" style="padding:20px 20px 28px;flex-shrink:0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <button onclick="showScreen('folder-detail')" class="btn-press" style="width:40px;height:40px;background:rgba(255,255,255,0.7);border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-press" style="width:40px;height:40px;background:rgba(255,255,255,0.7);border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+          <button class="btn-press" style="width:40px;height:40px;background:rgba(255,255,255,0.7);border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" fill="none" stroke="#374151" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="#374151"/><circle cx="12" cy="12" r="1" fill="#374151"/><circle cx="19" cy="12" r="1" fill="#374151"/></svg></button>
+        </div>
+      </div>
+      <div style="background:white;border-radius:24px;height:176px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);"><div style="text-align:center;"><div style="font-size:64px;margin-bottom:8px;">💻</div><div style="font-size:11px;color:#9ca3af;font-weight:600;">Warranty Certificate</div></div></div>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div><h1 style="font-size:20px;font-weight:900;color:#111;margin:0 0 6px;">Apple MacBook Warranty</h1><span style="background:#bae6fd;color:#0284c7;font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;">Warranties</span></div>
+      <div style="background:white;border-radius:20px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,0.07);">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;"><span style="font-size:12px;color:#9ca3af;font-weight:600;">Date Added</span><span style="font-size:12px;font-weight:800;color:#111;">Jan 12, 2024</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;"><span style="font-size:12px;color:#9ca3af;font-weight:600;">Issue Date</span><span style="font-size:12px;font-weight:800;color:#111;">Jan 10, 2024</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;"><span style="font-size:12px;color:#9ca3af;font-weight:600;">Expiry Date</span><span style="font-size:12px;font-weight:800;color:#111;">Feb 08, 2026</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="font-size:12px;color:#9ca3af;font-weight:600;">File Size</span><span style="font-size:12px;font-weight:800;color:#111;">2.4 MB</span></div>
+      </div>
+      <div style="background:#fde68a;border-radius:20px;padding:16px;display:flex;align-items:center;justify-content:space-between;"><div><div style="font-size:12px;font-weight:800;color:#c2410c;margin-bottom:3px;">⚠️ Warranty expires in 32 days</div><div style="font-size:11px;color:#c2410c;">Aug 18, 2025</div></div><button class="btn-press" style="background:#f97316;color:white;font-size:11px;font-weight:800;padding:9px 14px;border-radius:12px;">Set Reminder</button></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+        <button class="btn-press" style="background:#bae6fd;border-radius:18px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;"><svg width="20" height="20" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span style="font-size:10px;font-weight:800;color:#0284c7;">Share</span></button>
+        <button class="btn-press" style="background:#a7f3d0;border-radius:18px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;"><svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span style="font-size:10px;font-weight:800;color:#059669;">Download</span></button>
+        <button class="btn-press" style="background:#c4b5fd;border-radius:18px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;"><svg width="20" height="20" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><path d="M2 12h15a4 4 0 0 0 0-8h-1"/></svg><span style="font-size:10px;font-weight:800;color:#7c3aed;">Move</span></button>
+        <button class="btn-press" style="background:#f9a8d4;border-radius:18px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;"><svg width="20" height="20" fill="none" stroke="#db2777" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span style="font-size:10px;font-weight:800;color:#db2777;">Rename</span></button>
+      </div>
+      <div style="background:white;border-radius:20px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,0.07);"><div style="font-size:14px;font-weight:800;color:#111;margin-bottom:8px;">Notes</div><div style="font-size:12px;color:#6b7280;line-height:1.6;">Purchase receipt stored separately. Registered at Apple.com with serial number MBP2024-XK912.</div></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: ACTIVITY -->
+  <div id="screen-activity" class="screen scroll-area" style="padding:20px 20px 80px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h1 style="font-size:24px;font-weight:900;color:#111;margin:0;">Activity</h1><span style="font-size:13px;color:#9ca3af;font-weight:600;">July 2025</span></div>
+    <div class="scrollbar-hide" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:24px;" id="date-chips">
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:#10b981;color:white;box-shadow:0 4px 12px rgba(16,185,129,0.35);"><span style="font-size:9px;font-weight:700;opacity:0.75;">Mon</span><span style="font-size:16px;font-weight:900;">14</span></button>
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:white;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08);"><span style="font-size:9px;font-weight:700;opacity:0.6;">Tue</span><span style="font-size:16px;font-weight:900;">15</span></button>
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:white;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08);"><span style="font-size:9px;font-weight:700;opacity:0.6;">Wed</span><span style="font-size:16px;font-weight:900;">16</span></button>
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:white;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08);"><span style="font-size:9px;font-weight:700;opacity:0.6;">Thu</span><span style="font-size:16px;font-weight:900;">17</span></button>
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:white;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08);"><span style="font-size:9px;font-weight:700;opacity:0.6;">Fri</span><span style="font-size:16px;font-weight:900;">18</span></button>
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:white;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08);"><span style="font-size:9px;font-weight:700;opacity:0.6;">Sat</span><span style="font-size:16px;font-weight:900;">19</span></button>
+      <button onclick="setDateChip(this)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:18px;background:white;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08);"><span style="font-size:9px;font-weight:700;opacity:0.6;">Sun</span><span style="font-size:16px;font-weight:900;">20</span></button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:15px;font-weight:800;color:#111;">Upcoming</div><span style="background:#a7f3d0;color:#059669;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;">4 activities</span></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+      <div style="background:#93c5fd;border-radius:20px;padding:16px;"><div style="font-size:11px;color:#0284c7;font-weight:700;margin-bottom:4px;">32 Days Remaining</div><div style="font-size:14px;font-weight:800;color:#111;">Warranty Expiring</div><div style="font-size:12px;color:#374151;margin-top:2px;">MacBook Warranty</div></div>
+      <div style="background:#fcd34d;border-radius:20px;padding:16px;"><div style="font-size:11px;color:#b45309;font-weight:700;margin-bottom:4px;">Due Aug 18</div><div style="font-size:14px;font-weight:800;color:#111;">Insurance Renewal</div><div style="font-size:12px;color:#374151;margin-top:2px;">Bike Insurance</div></div>
+      <div style="background:#f0abfc;border-radius:20px;padding:16px;"><div style="font-size:11px;color:#9333ea;font-weight:700;margin-bottom:4px;">Tomorrow</div><div style="font-size:14px;font-weight:800;color:#111;">Receipt Review</div><div style="font-size:12px;color:#374151;margin-top:2px;">Business Expenses</div></div>
+      <div style="background:#c4b5fd;border-radius:20px;padding:16px;"><div style="font-size:11px;color:#7c3aed;font-weight:700;margin-bottom:4px;">5 Years Left</div><div style="font-size:14px;font-weight:800;color:#111;">Passport Renewal</div><div style="font-size:12px;color:#374151;margin-top:2px;">Passport Copy</div></div>
+    </div>
+    <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:12px;">Recent Activity</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="background:white;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><span style="font-size:20px;">📄</span><span style="flex:1;font-size:13px;font-weight:700;color:#374151;">Passport uploaded</span><span style="font-size:11px;color:#9ca3af;">2h ago</span></div>
+      <div style="background:white;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><span style="font-size:20px;">📁</span><span style="flex:1;font-size:13px;font-weight:700;color:#374151;">Receipt moved to Business</span><span style="font-size:11px;color:#9ca3af;">5h ago</span></div>
+      <div style="background:white;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><span style="font-size:20px;">🔔</span><span style="flex:1;font-size:13px;font-weight:700;color:#374151;">Warranty reminder created</span><span style="font-size:11px;color:#9ca3af;">Yesterday</span></div>
+      <div style="background:white;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);"><span style="font-size:20px;">🧾</span><span style="flex:1;font-size:13px;font-weight:700;color:#374151;">Invoice #1042 added</span><span style="font-size:11px;color:#9ca3af;">2 days ago</span></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: SEARCH -->
+  <div id="screen-search" class="screen scroll-area" style="padding:20px 20px 80px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="showScreen('home')" class="btn-press" style="width:42px;height:42px;background:white;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><svg width="20" height="20" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></button>
+      <h1 style="font-size:24px;font-weight:900;color:#111;margin:0;">Find Anything</h1>
+    </div>
+    <div style="background:white;border-radius:20px;display:flex;align-items:center;gap:10px;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:16px;">
+      <svg width="18" height="18" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="search-input" placeholder="Search documents, brands, dates…" style="flex:1;font-size:14px;border:none;background:transparent;color:#374151;" oninput="handleSearch(this.value)" />
+    </div>
+    <div class="scrollbar-hide" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:20px;">
+      <button class="chip" onclick="this.classList.toggle('active')">Receipts</button>
+      <button class="chip" onclick="this.classList.toggle('active')">This Month</button>
+      <button class="chip" onclick="this.classList.toggle('active')">Expiring Soon</button>
+      <button class="chip" onclick="this.classList.toggle('active')">PDF</button>
+      <button class="chip" onclick="this.classList.toggle('active')">Images</button>
+    </div>
+    <div id="suggested-section">
+      <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:12px;">Suggested Searches</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn-press" onclick="fillSearch('Warranty expiring this month')" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span style="font-size:13px;color:#374151;">Warranty expiring this month</span></button>
+        <button class="btn-press" onclick="fillSearch('Receipts from last week')" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span style="font-size:13px;color:#374151;">Receipts from last week</span></button>
+        <button class="btn-press" onclick="fillSearch('Insurance documents')" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span style="font-size:13px;color:#374151;">Insurance documents</span></button>
+        <button class="btn-press" onclick="fillSearch('Recently added files')" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span style="font-size:13px;color:#374151;">Recently added files</span></button>
+      </div>
+    </div>
+    <div id="results-section" style="display:none;">
+      <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:12px;">Results</div>
+      <div id="results-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: PROFILE -->
+  <div id="screen-profile" class="screen scroll-area" style="padding:20px 20px 80px;">
+    <div style="background:#7c69ef;border-radius:28px;padding:20px;color:white;box-shadow:0 8px 30px rgba(99,102,241,0.35);margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:32px;border:2px solid rgba(255,255,255,0.35);">👤</div>
+        <div><h2 style="font-size:20px;font-weight:900;margin:0 0 3px;" class="user-name">Antony Jacob</h2><div style="font-size:13px;opacity:0.8;margin-bottom:6px;" class="user-email">antony@email.com</div><span style="background:rgba(255,255,255,0.2);font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;">128 Documents Secured</span></div>
+      </div>
+    </div>
+    <div class="drive-status" style="display:none;align-items:center;gap:10px;background:white;border-radius:18px;padding:12px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;">
+      <svg width="18" height="18" viewBox="0 0 48 48" style="flex-shrink:0;"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18c-.44-1.32-.69-2.73-.69-4.18s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:#111;">Connected to Google Drive</div><div style="font-size:10px;color:#9ca3af;">Documents sync to your Drive account</div></div>
+      <button class="btn-press" onclick="navTo('signin');document.querySelectorAll('.drive-status').forEach(el=>el.style.display='none');" style="font-size:11px;font-weight:700;color:#ef4444;">Disconnect</button>
+    </div>
+    <div style="background:white;border-radius:24px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:16px;">Storage Analytics</div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;"><span style="font-weight:700;color:#374151;">Documents</span><span style="color:#9ca3af;">128 files</span></div><div style="background:#f3f4f6;border-radius:999px;height:8px;"><div style="background:#34d399;border-radius:999px;height:8px;width:60%;"></div></div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;"><span style="font-weight:700;color:#374151;">Images</span><span style="color:#9ca3af;">48 files</span></div><div style="background:#f3f4f6;border-radius:999px;height:8px;"><div style="background:#60a5fa;border-radius:999px;height:8px;width:22%;"></div></div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;"><span style="font-weight:700;color:#374151;">PDF Files</span><span style="color:#9ca3af;">51 files</span></div><div style="background:#f3f4f6;border-radius:999px;height:8px;"><div style="background:#a78bfa;border-radius:999px;height:8px;width:24%;"></div></div></div>
+      </div>
+      <div style="border-top:1px solid #f3f4f6;margin-top:16px;padding-top:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:15px;font-weight:800;color:#111;">2.4 GB used</div><div style="font-size:12px;color:#9ca3af;">of 5 GB total</div></div><button class="btn-press" style="background:#14b8a6;color:white;font-size:12px;font-weight:800;padding:9px 18px;border-radius:14px;">Upgrade</button></div>
+    </div>
+    <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:12px;">Settings</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn-press" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:36px;height:36px;background:#a7f3d0;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></div><span style="flex:1;font-size:13px;font-weight:700;color:#374151;text-align:left;">Document Categories</span><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="btn-press" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:36px;height:36px;background:#fed7aa;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><span style="flex:1;font-size:13px;font-weight:700;color:#374151;text-align:left;">Reminders</span><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="btn-press" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:36px;height:36px;background:#bae6fd;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div><span style="flex:1;font-size:13px;font-weight:700;color:#374151;text-align:left;">Cloud Backup</span><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="btn-press" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:36px;height:36px;background:#c4b5fd;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span style="flex:1;font-size:13px;font-weight:700;color:#374151;text-align:left;">Security &amp; Face ID</span><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="btn-press" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:36px;height:36px;background:#fde68a;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div><span style="flex:1;font-size:13px;font-weight:700;color:#374151;text-align:left;">Export Documents</span><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="btn-press" style="background:white;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:36px;height:36px;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><span style="flex:1;font-size:13px;font-weight:700;color:#374151;text-align:left;">Appearance</span><svg width="16" height="16" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav style="flex-shrink:0;background:white;border-top:1px solid #f3f4f6;padding:6px 4px;display:flex;align-items:center;justify-content:space-around;box-shadow:0 -2px 16px rgba(0,0,0,0.05);">
+    <button class="nav-btn active" id="nav-home" onclick="navTo('home')">
+      <div class="nav-icon"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+      <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-btn" id="nav-documents" onclick="navTo('documents')">
+      <div class="nav-icon"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+      <span class="nav-label">Documents</span>
+    </button>
+    <button class="scan-btn btn-press" onclick="navTo('add-document')">
+      <svg width="26" height="26" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </button>
+    <button class="nav-btn" id="nav-activity" onclick="navTo('activity')">
+      <div class="nav-icon"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <span class="nav-label">Activity</span>
+    </button>
+    <button class="nav-btn" id="nav-profile" onclick="navTo('profile')">
+      <div class="nav-icon"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <span class="nav-label">Profile</span>
+    </button>
+  </nav>
+
+  <!-- Home indicator -->
+  <div style="height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+    <div style="width:96px;height:4px;background:rgba(0,0,0,0.15);border-radius:999px;"></div>
+  </div>
+
+</div>
+
+<script>
+const screens=['signin','signin-account-picker','home','documents','folder-detail','add-document','doc-detail','activity','search','profile'];
+function completeSignIn(name,email,initials){
+  document.querySelectorAll('.user-name').forEach(el=>el.textContent=name);
+  document.querySelectorAll('.user-email').forEach(el=>el.textContent=email);
+  document.querySelectorAll('.user-initials').forEach(el=>el.textContent=initials);
+  document.querySelectorAll('.drive-status').forEach(el=>el.style.display='flex');
+  navTo('home');
+}
+function showScreen(id){screens.forEach(s=>{const e=document.getElementById('screen-'+s);if(e)e.classList.remove('active')});const t=document.getElementById('screen-'+id);if(t){t.classList.add('active');t.scrollTop=0;}}
+function navTo(id){showScreen(id);['home','documents','activity','profile'].forEach(n=>{const b=document.getElementById('nav-'+n);if(b)b.classList.remove('active')});const m={home:'home',documents:'documents','folder-detail':'documents','add-document':null,'doc-detail':'documents',activity:'activity',search:'home',profile:'profile'};const a=m[id];if(a){const b=document.getElementById('nav-'+a);if(b)b.classList.add('active');}}
+function setFilter(el){document.querySelectorAll('#folder-filters .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+function setDateChip(el){document.querySelectorAll('#date-chips button').forEach(b=>{b.style.background='white';b.style.color='#374151';b.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)';});el.style.background='#10b981';el.style.color='white';el.style.boxShadow='0 4px 12px rgba(16,185,129,0.35)';}
+function fillSearch(q){document.getElementById('search-input').value=q;handleSearch(q);}
+const sd=[{name:'MacBook Warranty',category:'Warranties',date:'12 Jul 2025',bg:'#bae6fd',icon:'💻'},{name:'Electricity Bill',category:'Receipts',date:'10 Jul 2025',bg:'#fde047',icon:'⚡'},{name:'Passport Copy',category:'IDs',date:'8 Jul 2025',bg:'#c4b5fd',icon:'🛂'},{name:'Bike Insurance',category:'Insurance',date:'5 Jul 2025',bg:'#fcd34d',icon:'🏍️'},{name:'Samsung TV Warranty',category:'Warranties',date:'1 Jul 2025',bg:'#bae6fd',icon:'📺'},{name:'iPhone 14 Pro',category:'Warranties',date:'28 Jun 2025',bg:'#bae6fd',icon:'📱'}];
+function handleSearch(q){const s=document.getElementById('suggested-section'),r=document.getElementById('results-section'),l=document.getElementById('results-list');if(!q.trim()){s.style.display='';r.style.display='none';return;}const f=sd.filter(d=>d.name.toLowerCase().includes(q.toLowerCase())||d.category.toLowerCase().includes(q.toLowerCase()));s.style.display='none';r.style.display='';if(!f.length){l.innerHTML='<div style="text-align:center;padding:32px;color:#9ca3af;font-size:14px;font-weight:700;">No results found</div>';return;}l.innerHTML=f.map(d=>`<button onclick="showScreen('doc-detail')" class="btn-press" style="background:white;border-radius:18px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);width:100%;"><div style="width:48px;height:48px;background:${d.bg};border-radius:14px;font-size:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${d.icon}</div><div style="flex:1;text-align:left;"><div style="font-size:13px;font-weight:800;color:#111;">${d.name}</div><div style="font-size:11px;color:#9ca3af;">${d.category} · ${d.date}</div></div></button>`).join('');}
+
+/* ============================================================
+   GOOGLE DRIVE INTEGRATION
+   Fill in GOOGLE_CLIENT_ID below (from Google Cloud Console →
+   APIs & Services → Credentials → OAuth client ID → Web app).
+   Add this page's URL to "Authorized JavaScript origins" there.
+   Without a real Client ID this falls back to the demo picker
+   so the prototype still works when opened as a plain file.
+   ============================================================ */
+const GOOGLE_CLIENT_ID = "836813073207-6i49go55g3939puiog1c0nligande9u9.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+let accessToken = null;
+let dockeepFolderId = null;
+let tokenClient = null;
+
+function startGoogleSignIn(){
+  const status = document.getElementById('signin-status');
+  if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith("YOUR_CLIENT_ID")){
+    // No real Client ID configured yet — show the demo account picker instead.
+    showScreen('signin-account-picker');
+    return;
+  }
+  if (!window.google || !google.accounts || !google.accounts.oauth2){
+    status.textContent = "Google sign-in is still loading, try again in a moment.";
+    return;
+  }
+  if (!tokenClient){
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: async (resp) => {
+        if (resp.error){ status.textContent = "Sign-in failed: " + resp.error; return; }
+        accessToken = resp.access_token;
+        status.textContent = "Signed in. Loading your Drive account…";
+        await onDriveAuthenticated();
+      }
+    });
+  }
+  status.textContent = "Opening Google sign-in…";
+  tokenClient.requestAccessToken();
+}
+
+async function driveFetch(url, options={}){
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...(options.headers||{}), Authorization: "Bearer " + accessToken }
+  });
+  if (!res.ok) throw new Error("Drive API error: " + res.status + " " + await res.text());
+  return res.json();
+}
+
+async function getUserProfile(){
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: "Bearer " + accessToken }
+  });
+  return res.json();
+}
+
+async function ensureDockeepFolder(){
+  const q = encodeURIComponent("name='DocKeep' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const list = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+  if (list.files && list.files.length){ return list.files[0].id; }
+  const created = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "DocKeep", mimeType: "application/vnd.google-apps.folder" })
+  });
+  return created.id;
+}
+
+async function onDriveAuthenticated(){
+  try {
+    const profile = await getUserProfile();
+    const initials = (profile.name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+    completeSignIn(profile.name || profile.email, profile.email, initials);
+    dockeepFolderId = await ensureDockeepFolder();
+    await refreshDocumentsFromDrive();
+  } catch (e){
+    console.error(e);
+    document.getElementById('signin-status').textContent = "Couldn't load Drive: " + e.message;
+  }
+}
+
+async function refreshDocumentsFromDrive(){
+  if (!accessToken || !dockeepFolderId) return;
+  const q = encodeURIComponent(`'${dockeepFolderId}' in parents and trashed=false`);
+  const data = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size)&orderBy=modifiedTime desc`);
+  const files = data.files || [];
+  // Wire real files into the Recent Documents list on Home.
+  const homeRecent = document.querySelector('#screen-home div[style*="Recent Documents"]');
+  if (files.length && homeRecent){
+    const container = homeRecent.parentElement.querySelector('div[style*="flex-direction:column"]');
+    if (container){
+      container.innerHTML = files.slice(0,6).map(f => `
+        <button class="btn-press" onclick="window.open('${f.webViewLink}', '_blank')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:100%;">
+          <div style="width:48px;height:48px;background:#bae6fd;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📄</div>
+          <div style="flex:1;text-align:left;">
+            <div style="font-size:13px;font-weight:800;color:#111;">${f.name}</div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Google Drive · ${new Date(f.modifiedTime).toLocaleDateString()}</div>
+          </div>
+        </button>`).join('');
+    }
+  }
+}
+
+function handleFileChosen(file){
+  if (!file) return;
+  window._pendingUploadFile = file;
+  const chip = document.getElementById('chosen-file-chip');
+  chip.style.display = 'block';
+  chip.textContent = "📎 " + file.name;
+  if (!document.getElementById('doc-title-input').value){
+    document.getElementById('doc-title-input').value = file.name.replace(/\.[^/.]+$/, "");
+  }
+}
+
+async function saveDocumentToDrive(){
+  const title = document.getElementById('doc-title-input').value.trim() || "Untitled Document";
+  const file = window._pendingUploadFile;
+  if (!accessToken){
+    alert("Sign in with Google first to save documents to Drive.");
+    return;
+  }
+  if (!file){
+    alert("Choose a file to upload (tap Upload File) before saving.");
+    return;
+  }
+  const metadata = { name: title, parents: [dockeepFolderId] };
+  const form = new FormData();
+  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+  form.append("file", file);
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + accessToken },
+    body: form
+  });
+  if (!res.ok){ alert("Upload failed: " + await res.text()); return; }
+  await refreshDocumentsFromDrive();
+  window._pendingUploadFile = null;
+  document.getElementById('chosen-file-chip').style.display = 'none';
+  document.getElementById('doc-title-input').value = '';
+  navTo('home');
+}
+
+</script>
+
+<style>
+@media(max-width:520px){body{padding:0;background:#f5f5f7}.phone-frame{width:100vw;height:100dvh;border:0;border-radius:0;box-shadow:none}}
+.dk-toast{position:absolute;left:20px;right:20px;bottom:92px;z-index:999;background:#111827;color:white;padding:12px 14px;border-radius:14px;font-size:12px;font-weight:800;text-align:center;box-shadow:0 8px 30px #0004}
+</style>
+<script>
+/* DocKeep local working layer: IndexedDB persistence + upload/camera/gallery + dynamic docs + actions */
+const DK_DB='DocKeepDB', DK_STORE='documents'; let dkDocs=[], dkCurrent=null, dkCategory='Warranties';
+function dkToast(m){let e=document.createElement('div');e.className='dk-toast';e.textContent=m;document.querySelector('.phone-frame').appendChild(e);setTimeout(()=>e.remove(),2200)}
+function dkOpenDB(){return new Promise((ok,no)=>{let r=indexedDB.open(DK_DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(DK_STORE,{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+async function dkLoad(){let db=await dkOpenDB();dkDocs=await new Promise((ok,no)=>{let r=db.transaction(DK_STORE).objectStore(DK_STORE).getAll();r.onsuccess=()=>ok(r.result||[]);r.onerror=()=>no(r.error)});dkDocs.sort((a,b)=>b.created-a.created);dkRender()}
+async function dkPut(d){let db=await dkOpenDB();await new Promise((ok,no)=>{let r=db.transaction(DK_STORE,'readwrite').objectStore(DK_STORE).put(d);r.onsuccess=ok;r.onerror=()=>no(r.error)});await dkLoad()}
+async function dkDelete(id){let db=await dkOpenDB();await new Promise((ok,no)=>{let r=db.transaction(DK_STORE,'readwrite').objectStore(DK_STORE).delete(id);r.onsuccess=ok;r.onerror=()=>no(r.error)});dkCurrent=null;await dkLoad();navTo('documents');dkToast('Document deleted')}
+function dkFmt(n){if(!n)return'0 B';let u=['B','KB','MB','GB'],i=Math.min(3,Math.floor(Math.log(n)/Math.log(1024)));return(n/1024**i).toFixed(i?1:0)+' '+u[i]}
+function dkIcon(d){return d.type?.startsWith('image/')?'🖼️':d.type==='application/pdf'?'📕':'📄'}
+function dkCard(d){return `<button class="btn-press" onclick="dkOpen('${d.id}')" style="background:white;border-radius:20px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px #00000012;width:100%"><div style="width:48px;height:48px;background:#ccfbf1;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px">${dkIcon(d)}</div><div style="flex:1;text-align:left"><div style="font-size:13px;font-weight:800;color:#111">${d.title}</div><div style="font-size:11px;color:#9ca3af">${d.category} · ${new Date(d.created).toLocaleDateString()}</div></div></button>`}
+function dkRender(){
+ let recent=document.querySelector('#screen-home div[style*="Recent Documents"]')?.parentElement?.querySelector('div[style*="flex-direction:column"]');if(recent&&dkDocs.length)recent.innerHTML=dkDocs.slice(0,5).map(dkCard).join('');
+ let count=document.querySelector('#screen-home div[style*="font-size:36px"]');if(count)count.textContent=dkDocs.length;
+ sd.splice(0,sd.length,...dkDocs.map(d=>({name:d.title,category:d.category,date:new Date(d.created).toLocaleDateString(),bg:'#ccfbf1',icon:dkIcon(d),id:d.id})));
+}
+function dkOpen(id){dkCurrent=dkDocs.find(d=>d.id===id);if(!dkCurrent)return;let sc=document.getElementById('screen-doc-detail');let h=sc.querySelector('h1');if(h)h.textContent=dkCurrent.title;let notes=[...sc.querySelectorAll('div')].find(x=>x.textContent==='Notes')?.parentElement;if(notes)notes.lastElementChild.textContent=dkCurrent.notes||'No notes added.';let preview=sc.querySelector('div[style*="height:176px"]');if(preview){if(dkCurrent.type?.startsWith('image/'))preview.innerHTML=`<img src="${URL.createObjectURL(dkCurrent.blob)}" style="width:100%;height:100%;object-fit:contain;border-radius:24px">`;else preview.innerHTML=`<div style="text-align:center"><div style="font-size:64px">${dkIcon(dkCurrent)}</div><div style="font-size:11px;color:#9ca3af">${dkCurrent.name}</div></div>`}navTo('doc-detail')}
+function dkDownload(){if(!dkCurrent)return;let a=document.createElement('a');a.href=URL.createObjectURL(dkCurrent.blob);a.download=dkCurrent.name||dkCurrent.title;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+async function dkShare(){if(!dkCurrent)return;let f=new File([dkCurrent.blob],dkCurrent.name,{type:dkCurrent.type});if(navigator.share&&navigator.canShare?.({files:[f]}))await navigator.share({title:dkCurrent.title,files:[f]});else dkDownload()}
+async function dkRename(){if(!dkCurrent)return;let n=prompt('New document name',dkCurrent.title);if(n?.trim()){dkCurrent.title=n.trim();await dkPut(dkCurrent);dkOpen(dkCurrent.id);dkToast('Renamed')}}
+async function dkMove(){if(!dkCurrent)return;let n=prompt('Move to category','Receipts');if(n?.trim()){dkCurrent.category=n.trim();await dkPut(dkCurrent);dkOpen(dkCurrent.id);dkToast('Document moved')}}
+function dkPick(mode){let i=document.getElementById('dk-'+mode);if(i)i.click()}
+function dkChosen(file){handleFileChosen(file)}
+const _oldSave=saveDocumentToDrive;
+saveDocumentToDrive=async function(){let file=window._pendingUploadFile,title=document.getElementById('doc-title-input').value.trim();if(!file){dkToast('Choose, scan, or take a photo first');return}if(!title){dkToast('Add a document title');return}let notes=document.querySelector('#screen-add-document input[placeholder="Add a note…"]')?.value||'';let d={id:crypto.randomUUID(),title,name:file.name||title+'.jpg',type:file.type||'application/octet-stream',size:file.size,category:dkCategory,notes,created:Date.now(),blob:file};await dkPut(d);window._pendingUploadFile=null;document.getElementById('chosen-file-chip').style.display='none';document.getElementById('doc-title-input').value='';navTo('home');dkToast('Document saved securely on this device')}
+window.addEventListener('DOMContentLoaded',()=>{
+ let add=document.getElementById('screen-add-document');let buttons=add.querySelectorAll('div[style*="grid-template-columns:1fr 1fr"] > button');if(buttons[0])buttons[0].onclick=()=>dkPick('scan');if(buttons[2])buttons[2].onclick=()=>dkPick('camera');if(buttons[3])buttons[3].onclick=()=>dkPick('gallery');add.insertAdjacentHTML('beforeend','<input id="dk-scan" type="file" accept="image/*,application/pdf" capture="environment" hidden onchange="dkChosen(this.files[0])"><input id="dk-camera" type="file" accept="image/*" capture="environment" hidden onchange="dkChosen(this.files[0])"><input id="dk-gallery" type="file" accept="image/*" multiple hidden onchange="dkChosen(this.files[0])">');
+ add.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{add.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');dkCategory=c.textContent.trim()});
+ let actions=document.querySelectorAll('#screen-doc-detail div[style*="grid-template-columns:repeat(4,1fr)"] button');if(actions[0])actions[0].onclick=dkShare;if(actions[1])actions[1].onclick=dkDownload;if(actions[2])actions[2].onclick=dkMove;if(actions[3])actions[3].onclick=dkRename;
+ let more=document.querySelector('#screen-doc-detail div[style*="display:flex;gap:8px"] button:last-child');if(more)more.onclick=()=>{if(dkCurrent&&confirm('Delete this document?'))dkDelete(dkCurrent.id)};
+ let search=document.querySelector('#screen-documents input');if(search)search.oninput=e=>{let q=e.target.value.toLowerCase();let cards=dkDocs.filter(d=>d.title.toLowerCase().includes(q)||d.category.toLowerCase().includes(q));let grid=search.closest('#screen-documents').querySelector('div[style*="display:grid"]');if(q)grid.innerHTML='<div style="grid-column:1/-1;display:flex;flex-direction:column;gap:10px">'+(cards.map(dkCard).join('')||'<div style="text-align:center;color:#9ca3af;padding:30px">No documents found</div>')+'</div>';else location.reload()};
+ dkLoad();
+});
+</script>
+
+</body>
+</html>
