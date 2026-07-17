@@ -2,10 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DocKeep — Document Manager</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
@@ -55,17 +52,6 @@
     *,*::before,*::after{box-sizing:border-box;}
     body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--background);}
     html,body,#root{height:100%;overflow:hidden;}
-    /* Mobile browsers (esp. iOS Safari) miscalculate 100vh because of the address bar.
-       100dvh (dynamic viewport height) accounts for that; browsers that don't support
-       it simply ignore the second rule and keep the 100vh fallback above. */
-    .full-h{height:100vh;height:100dvh;}
-    /* iOS Safari auto-zooms the page when a focused input has font-size < 16px.
-       Force 16px on small screens so typing doesn't trigger an unwanted zoom. */
-    @media (max-width:640px){
-      input,textarea,select{font-size:16px!important;}
-    }
-    .safe-bottom{padding-bottom:calc(20px + env(safe-area-inset-bottom));}
-    .safe-top{padding-top:env(safe-area-inset-top);}
     .ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;display:inline-flex;align-items:center;justify-content:center;line-height:1;text-transform:none;white-space:nowrap;direction:ltr;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;user-select:none;}
     .scrollbar-hide{scrollbar-width:none;-ms-overflow-style:none;}
     .scrollbar-hide::-webkit-scrollbar{display:none;}
@@ -155,46 +141,22 @@
       if (n < 1024*1024) return `${(n/1024).toFixed(1)} KB`;
       return `${(n/1024/1024).toFixed(1)} MB`;
     }
-    // Title / document date / expiry date / warranty ID aren't separate columns on the
-    // backend — we pack them into the existing "tags" field as one hidden entry so no
-    // Apps Script changes are needed, then unpack them again here on read.
-    const META_PREFIX = "__meta:";
-    function encodeMeta(fields) {
-      const parts = Object.entries(fields)
-        .filter(([,v]) => v !== undefined && v !== null && String(v).trim() !== "")
-        .map(([k,v]) => `${k}=${String(v).trim().replace(/[;,]/g, " ")}`);
-      return parts.length ? `${META_PREFIX}${parts.join(";")}` : "";
-    }
-    function decodeMeta(tagStr) {
-      const out = {};
-      if (!tagStr || !tagStr.startsWith(META_PREFIX)) return out;
-      tagStr.slice(META_PREFIX.length).split(";").forEach(p=>{
-        const i = p.indexOf("=");
-        if (i>0) out[p.slice(0,i)] = p.slice(i+1);
-      });
-      return out;
-    }
-    function expiryStatus(expiry) {
-      if (!expiry) return null;
-      const d = new Date(expiry);
-      if (isNaN(d)) return null;
-      const days = Math.ceil((d - new Date().setHours(0,0,0,0)) / 86400000);
-      if (days < 0) return { label: "Expired", color: "#EA4335", days };
-      if (days <= 30) return { label: days===0?"Expires today":`Expires in ${days}d`, color: "#FBBC05", days };
-      return { label: `Expires ${d.toLocaleDateString()}`, color: "#34A853", days };
-    }
     function mapDocFromApi(d) {
-      const rawTags = (d.tags ? String(d.tags).split(",").map(t=>t.trim()).filter(Boolean) : []);
-      const metaTag = rawTags.find(t=>t.startsWith(META_PREFIX));
-      const meta = metaTag ? decodeMeta(metaTag) : {};
-      const tags = rawTags.filter(t=>!t.startsWith(META_PREFIX));
       return {
-        id: d.id, name: d.name, title: meta.title || d.name, type: extToType(d.name),
+        id: d.id, name: d.name, title: d.title || d.name, type: extToType(d.name),
         size: formatBytes(d.size), rawSize: Number(d.size)||0, date: d.date ? new Date(d.date).toLocaleDateString() : "",
-        customer: d.customer || "", cat: d.type || "", tags,
-        docDate: meta.docdate || "", expiry: meta.expiry || "", warranty: meta.warranty || "",
+        docDate: d.docDate || "", expiryDate: d.expiryDate || "", refId: d.refId || "",
+        customer: d.customer || "", cat: d.type || "",
+        tags: (d.tags ? String(d.tags).split(",").map(t=>t.trim()).filter(Boolean) : []),
         starred: false, url: d.url, driveId: d.driveId,
       };
+    }
+    function isExpiringSoon(expiryDateStr) {
+      if (!expiryDateStr) return false;
+      const exp = new Date(expiryDateStr);
+      if (isNaN(exp)) return false;
+      const days = (exp - new Date()) / (1000*60*60*24);
+      return days <= 30; // includes already-expired (negative days)
     }
     async function refreshDocuments(email) {
       const data = await apiCall("documents", { email });
@@ -225,11 +187,6 @@
       return <button onClick={()=>onChange(!on)} style={{width:48,height:28,borderRadius:99,border:'none',cursor:'pointer',position:'relative',flexShrink:0,background:on?'var(--primary)':'var(--muted)',transition:'background .25s',padding:0}} className="toggle-track">
         <div className="toggle-thumb" style={{width:20,height:20,borderRadius:'50%',background:'white',position:'absolute',top:4,transform:`translateX(${on?22:4}px)`,boxShadow:'0 1px 4px rgba(0,0,0,.25)'}}/>
       </button>;
-    }
-    function ExpiryBadge({expiry}) {
-      const st=expiryStatus(expiry);
-      if(!st) return null;
-      return <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:99,background:st.color+'20',color:st.color,whiteSpace:'nowrap'}}>{st.label}</span>;
     }
     function StatCard({icon,label,value,sub,color}) {
       return <div className="bg-card rounded-2xl border border-border flex flex-col gap-3" style={{padding:16}}>
@@ -278,8 +235,8 @@
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
           <StatCard icon="description"  label="Total Documents" value={String(DOCS.length)} sub={DOCS.length===0?"Upload your first document":`${DOCS.length} stored`} color="#4285F4"/>
           <StatCard icon="group"        label="Customers"        value={String(CUSTOMERS.length)} sub={CUSTOMERS.length===0?"No customers yet":`${CUSTOMERS.length} on file`} color="#34A853"/>
-          <StatCard icon="event_busy"   label="Expiring Soon"    value={String(DOCS.filter(d=>{const st=expiryStatus(d.expiry);return st&&st.days<=30;}).length)} sub="within 30 days"    color="#FBBC05"/>
           <StatCard icon="trending_up"  label="This Month"       value={String(DOCS.filter(d=>{const dt=new Date(d.date);const now=new Date();return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();}).length)} sub="uploads this month" color="#9C27B0"/>
+          <StatCard icon="warning"      label="Warranties Expiring" value={String(DOCS.filter(d=>d.expiryDate&&isExpiringSoon(d.expiryDate)).length)} sub="within 30 days" color="#EA4335"/>
         </div>
 
         <div>
@@ -295,12 +252,9 @@
                   <I n="description" size={28} style={{color}}/>
                   <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:99,background:color+'20',color}}>{label}</span>
                 </div>
-                <div style={{fontSize:12,fontWeight:500,color:'var(--foreground)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{doc.title}</div>
+                <div style={{fontSize:12,fontWeight:500,color:'var(--foreground)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{doc.title||doc.name}</div>
                 <div style={{fontSize:11,color:'var(--muted-foreground)',marginTop:4}}>{doc.date}</div>
-                <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
-                  {doc.starred&&<I n="star" size={12} fill={1} style={{color:'#FBBC05'}}/>}
-                  <ExpiryBadge expiry={doc.expiry}/>
-                </div>
+                {doc.starred&&<I n="star" size={12} fill={1} style={{color:'#FBBC05',marginTop:4,display:'block'}}/>}
               </div>;
             })}</div>
         </div>
@@ -336,8 +290,7 @@
       const FILTERS=["All","PDF","Images","Word","Scanned","Starred"];
       const docs=useMemo(()=>DOCS.filter(d=>{
         const fok=filter==="All"?true:filter==="Starred"?d.starred:filter==="PDF"?d.type==="pdf":filter==="Images"?d.type==="image":filter==="Word"?d.type==="word":filter==="Scanned"?d.type==="scan":true;
-        const hay=[d.title,d.name,d.customer,d.warranty].filter(Boolean).join(" ").toLowerCase();
-        const sok=!q||hay.includes(q.toLowerCase());
+        const sok=!q||d.name.toLowerCase().includes(q.toLowerCase())||(d.customer||"").toLowerCase().includes(q.toLowerCase());
         return fok&&sok;
       }),[filter,q]);
 
@@ -384,13 +337,11 @@
                   </button>
                 </div>
                 <div style={{padding:12}}>
-                  <div style={{fontSize:12,fontWeight:500,color:'var(--foreground)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{doc.title}</div>
+                  <div style={{fontSize:12,fontWeight:500,color:'var(--foreground)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{doc.title||doc.name}</div>
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:6}}>
                     <span style={{fontSize:11,color:'var(--muted-foreground)'}}>{doc.size}</span>
                     <span style={{fontSize:11,color:'var(--muted-foreground)'}}>{doc.date.split(",")[0]}</span>
                   </div>
-                  {doc.expiry&&<div style={{marginTop:8}}><ExpiryBadge expiry={doc.expiry}/></div>}
-                  {doc.warranty&&<div style={{fontSize:10,color:'var(--muted-foreground)',marginTop:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>ID: {doc.warranty}</div>}
                   {doc.customer&&<div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
                     <div style={{width:16,height:16,borderRadius:'50%',background:'rgba(66,133,244,.15)',display:'flex',alignItems:'center',justifyContent:'center'}}>
                       <I n="person" size={10} cls="text-primary"/>
@@ -411,17 +362,19 @@
                   <span style={{fontSize:9,fontWeight:700,color}}>{label}</span>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{doc.title}</div>
-                  <div style={{display:'flex',gap:8,marginTop:2,fontSize:11,color:'var(--muted-foreground)',flexWrap:'wrap',alignItems:'center'}}>
+                  <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{doc.title||doc.name}</div>
+                  <div style={{display:'flex',gap:8,marginTop:2,fontSize:11,color:'var(--muted-foreground)',flexWrap:'wrap'}}>
                     <span>{doc.size}</span><span>·</span><span>{doc.date}</span>
+                    {doc.refId&&<><span>·</span><span>ID {doc.refId}</span></>}
                     {doc.customer&&<><span>·</span><span>{doc.customer}</span></>}
-                    {doc.warranty&&<><span>·</span><span>ID: {doc.warranty}</span></>}
-                    <ExpiryBadge expiry={doc.expiry}/>
                   </div>
+                  {doc.expiryDate&&<div style={{marginTop:4,display:'inline-flex',alignItems:'center',gap:4,fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:99,background:isExpiringSoon(doc.expiryDate)?'rgba(234,67,53,.12)':'rgba(52,168,83,.12)',color:isExpiringSoon(doc.expiryDate)?'#B3261E':'#1A6E33'}}>
+                    <I n="event" size={11}/>{new Date(doc.expiryDate) < new Date() ? "Expired " : "Expires "}{new Date(doc.expiryDate).toLocaleDateString()}
+                  </div>}
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
                   {doc.starred&&<I n="star" size={14} fill={1} style={{color:'#FBBC05'}}/>}
-                  <button onClick={e=>{e.stopPropagation();onDelete(doc);}} aria-label={`Delete ${doc.title}`} style={{background:'none',border:'none',cursor:'pointer',padding:4}}>
+                  <button onClick={e=>{e.stopPropagation();onDelete(doc);}} aria-label={`Delete ${doc.name}`} style={{background:'none',border:'none',cursor:'pointer',padding:4}}>
                     <I n="delete" size={16} cls="text-muted-foreground"/>
                   </button>
                 </div>
@@ -433,23 +386,14 @@
     }
 
     /* ── Scan ─────────────────────────────────── */
-    function FieldLabel({children}) {
-      return <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--muted-foreground)',marginBottom:6}}>{children}</label>;
-    }
-    function TextField({value,onChange,placeholder,type="text"}) {
-      return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-        style={{width:'100%',fontSize:14,color:'var(--foreground)',background:'var(--muted)',border:'1px solid var(--border)',borderRadius:12,padding:'10px 12px',outline:'none'}}/>;
-    }
-
     function ScanScreen({user,onUploaded}) {
       const [drag,setDrag]=useState(false);
-      const [file,setFile]=useState(null);          // the raw File object, awaiting details
+      const [picked,setPicked]=useState(null);     // {file,name,size}
       const [title,setTitle]=useState("");
+      const [docDate,setDocDate]=useState(()=>new Date().toISOString().slice(0,10));
+      const [expiryDate,setExpiryDate]=useState("");
+      const [refId,setRefId]=useState("");
       const [customer,setCustomer]=useState("");
-      const [docDate,setDocDate]=useState("");
-      const [expiry,setExpiry]=useState("");
-      const [warranty,setWarranty]=useState("");
-      const [progress,setProgress]=useState(0);
       const [uploading,setUploading]=useState(false);
       const [error,setError]=useState("");
       const [done,setDone]=useState(false);
@@ -457,32 +401,28 @@
 
       function pickFile(file){
         if(!file) return;
-        setError(""); setDone(false); setProgress(0);
-        setFile(file);
-        setTitle(file.name.replace(/\.[^/.]+$/, ""));
-        setCustomer(""); setDocDate(""); setExpiry(""); setWarranty("");
+        setError(""); setDone(false);
+        setPicked({file,name:file.name,size:file.size});
+        setTitle(file.name.replace(/\.[^.]+$/,""));
+        setExpiryDate(""); setRefId(""); setCustomer("");
+        setDocDate(new Date().toISOString().slice(0,10));
       }
 
-      function resetForm(){
-        setFile(null); setTitle(""); setCustomer(""); setDocDate(""); setExpiry(""); setWarranty("");
-        setError(""); setProgress(0); setDone(false);
-        if(inputRef.current) inputRef.current.value="";
-      }
-
-      async function handleUpload(){
-        if(!file) return;
-        setError(""); setUploading(true); setProgress(10);
+      async function handleUpload(e){
+        e.preventDefault();
+        if(!picked) return;
+        setUploading(true); setError("");
         try{
-          const base64=await fileToBase64(file);
-          setProgress(55);
-          const tags=encodeMeta({title, docdate:docDate, expiry, warranty});
+          const base64=await fileToBase64(picked.file);
           await apiCall("upload",{
-            email:user.email, fileName:file.name, mimeType:file.type||"application/octet-stream",
-            file:base64, type:extToType(file.name), customer, tags, size:file.size,
+            email:user.email, fileName:picked.name, mimeType:picked.file.type||"application/octet-stream",
+            file:base64, type:extToType(picked.name), size:picked.size,
+            title: title||picked.name, docDate, expiryDate, refId, customer,
+            tags: "",
           });
-          setProgress(100);
           await onUploaded();
           setDone(true);
+          setPicked(null);
         }catch(err){
           setError(err.message||"Upload failed. Check the Apps Script URL and try again.");
         }finally{
@@ -496,100 +436,90 @@
           <p style={{fontSize:14,color:'var(--muted-foreground)',marginTop:4,marginBottom:0}}>Add documents to your library</p>
         </div>
         <input ref={inputRef} type="file" style={{display:'none'}} onChange={e=>pickFile(e.target.files[0])} aria-hidden="true"/>
-
-        {!file && !done && (
-          <>
-            <div onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}
-              onDrop={e=>{e.preventDefault();setDrag(false);pickFile(e.dataTransfer.files[0]);}}
-              onClick={()=>inputRef.current&&inputRef.current.click()}
-              role="button" tabIndex={0} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();inputRef.current&&inputRef.current.click();}}}
-              aria-label="Upload a document from your device"
-              style={{border:`2px dashed ${drag?'var(--primary)':'var(--border)'}`,borderRadius:24,padding:'48px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:16,cursor:'pointer',transition:'all .2s',background:drag?'rgba(66,133,244,.05)':'transparent',transform:drag?'scale(1.01)':'scale(1)'}}>
-              <div style={{width:80,height:80,borderRadius:18,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(66,133,244,.1)'}}>
-                <I n="document_scanner" size={36} style={{color:'var(--primary)'}}/>
-              </div>
-              <div style={{textAlign:'center'}}>
-                <div style={{fontWeight:600,color:'var(--foreground)',fontSize:15}}>Drop a file here</div>
-                <div style={{fontSize:13,color:'var(--muted-foreground)',marginTop:4}}>or click to browse your device</div>
-              </div>
-              <div style={{display:'flex',gap:8,fontSize:12,color:'var(--muted-foreground)',flexWrap:'wrap',justifyContent:'center'}}>
-                {["PDF","JPG","PNG","DOCX"].map(f=><span key={f} style={{background:'var(--muted)',padding:'4px 10px',borderRadius:8}}>{f}</span>)}
-                <span>· up to 50 MB</span>
-              </div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
-              {[{icon:"photo_camera",label:"Camera",sub:"Take a photo now",color:"#4285F4",capture:"environment"},{icon:"document_scanner",label:"Scan Document",sub:"Multi-page scan",color:"#34A853",capture:"environment"},{icon:"upload",label:"From Files",sub:"Browse device",color:"#FBBC05"},{icon:"layers",label:"Google Drive",sub:"Import from cloud",color:"#EA4335"}].map(o=>(
-                <button key={o.label} className="ripple" onClick={()=>inputRef.current&&inputRef.current.click()} style={{background:'var(--card)',borderRadius:16,border:'1px solid var(--border)',padding:16,display:'flex',alignItems:'center',gap:12,cursor:'pointer',textAlign:'left',transition:'box-shadow .15s'}}>
-                  <div style={{width:48,height:48,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,background:o.color+'15',color:o.color}}>
-                    <I n={o.icon} size={24}/>
-                  </div>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontWeight:500,color:'var(--foreground)',fontSize:13}}>{o.label}</div>
-                    <div style={{fontSize:11,color:'var(--muted-foreground)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.sub}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {file && !done && (
-          <div className="bg-card rounded-2xl border border-border page-enter" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-            <div style={{display:'flex',alignItems:'center',gap:12}}>
-              <div style={{width:36,height:36,borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(66,133,244,.1)',flexShrink:0}}>
-                <I n="description" size={18} cls="text-primary"/>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{file.name}</div>
-                <div style={{fontSize:11,color:'var(--muted-foreground)'}}>{formatBytes(file.size)}{uploading?" · Uploading…":""}</div>
-              </div>
-              {!uploading&&<button onClick={resetForm} aria-label="Remove file" style={{background:'none',border:'none',cursor:'pointer',padding:4}}><I n="close" size={18} cls="text-muted-foreground"/></button>}
-            </div>
-
-            {uploading && <div style={{height:6,background:'var(--muted)',borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',background:'var(--primary)',borderRadius:3,width:`${progress}%`,transition:'width .4s'}}/>
-            </div>}
-
-            <div>
-              <FieldLabel>Title</FieldLabel>
-              <TextField value={title} onChange={setTitle} placeholder="e.g. Refrigerator Warranty Card"/>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <div>
-                <FieldLabel>Document Date</FieldLabel>
-                <TextField type="date" value={docDate} onChange={setDocDate}/>
-              </div>
-              <div>
-                <FieldLabel>Expiry Date</FieldLabel>
-                <TextField type="date" value={expiry} onChange={setExpiry}/>
-              </div>
-            </div>
-            <div>
-              <FieldLabel>Warranty / Reference ID</FieldLabel>
-              <TextField value={warranty} onChange={setWarranty} placeholder="e.g. WR-2026-00417"/>
-            </div>
-            <div>
-              <FieldLabel>Customer (optional)</FieldLabel>
-              <TextField value={customer} onChange={setCustomer} placeholder="Link this to a customer"/>
-            </div>
-
-            {error&&<div role="alert" style={{padding:12,borderRadius:12,background:'rgba(234,67,53,.1)',color:'var(--destructive)',fontSize:13}}>{error}</div>}
-
-            <div style={{display:'flex',gap:10}}>
-              <button onClick={resetForm} disabled={uploading} className="ripple" style={{flex:1,padding:'12px',borderRadius:14,border:'1px solid var(--border)',background:'transparent',color:'var(--foreground)',fontWeight:600,fontSize:14,cursor:uploading?'default':'pointer',opacity:uploading?.5:1}}>Cancel</button>
-              <button onClick={handleUpload} disabled={uploading} className="ripple" style={{flex:2,padding:'12px',borderRadius:14,border:'none',background:'var(--primary)',color:'var(--primary-foreground)',fontWeight:600,fontSize:14,cursor:uploading?'default':'pointer',opacity:uploading?.7:1}}>{uploading?`Uploading… ${progress}%`:"Save Document"}</button>
-            </div>
+        {!picked&&<div onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}
+          onDrop={e=>{e.preventDefault();setDrag(false);pickFile(e.dataTransfer.files[0]);}}
+          onClick={()=>inputRef.current&&inputRef.current.click()}
+          role="button" tabIndex={0} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();inputRef.current&&inputRef.current.click();}}}
+          aria-label="Upload a document from your device"
+          style={{border:`2px dashed ${drag?'var(--primary)':done?'#34A853':'var(--border)'}`,borderRadius:24,padding:'48px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:16,cursor:'pointer',transition:'all .2s',background:drag?'rgba(66,133,244,.05)':done?'rgba(52,168,83,.05)':'transparent',transform:drag?'scale(1.01)':'scale(1)'}}>
+          <div style={{width:80,height:80,borderRadius:18,display:'flex',alignItems:'center',justifyContent:'center',background:done?'rgba(52,168,83,.15)':'rgba(66,133,244,.1)'}}>
+            <I n={done?"check_circle":"document_scanner"} size={36} fill={done?1:0} style={{color:done?'#34A853':'var(--primary)'}}/>
           </div>
-        )}
-
-        {done && <div className="bg-card rounded-2xl border border-border page-enter" style={{padding:24,textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
-          <div style={{width:64,height:64,borderRadius:18,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(52,168,83,.15)'}}>
-            <I n="check_circle" size={30} fill={1} style={{color:'#34A853'}}/>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontWeight:600,color:'var(--foreground)',fontSize:15}}>{done?"Uploaded! Drop another file":"Drop a file here"}</div>
+            <div style={{fontSize:13,color:'var(--muted-foreground)',marginTop:4}}>or click to browse your device</div>
           </div>
-          <div style={{fontWeight:600,color:'var(--foreground)',fontSize:15}}>Uploaded!</div>
-          <button onClick={resetForm} className="ripple" style={{padding:'10px 20px',borderRadius:14,border:'none',background:'var(--primary)',color:'var(--primary-foreground)',fontWeight:600,fontSize:14,cursor:'pointer'}}>Add Another Document</button>
+          <div style={{display:'flex',gap:8,fontSize:12,color:'var(--muted-foreground)',flexWrap:'wrap',justifyContent:'center'}}>
+            {["PDF","JPG","PNG","DOCX"].map(f=><span key={f} style={{background:'var(--muted)',padding:'4px 10px',borderRadius:8}}>{f}</span>)}
+            <span>· up to 50 MB</span>
+          </div>
         </div>}
+        {error&&<div role="alert" style={{padding:12,borderRadius:12,background:'rgba(234,67,53,.1)',color:'var(--destructive)',fontSize:13}}>{error}</div>}
 
+        {picked&&<form onSubmit={handleUpload} className="bg-card rounded-2xl border border-border flex flex-col gap-4" style={{padding:20}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(66,133,244,.1)',flexShrink:0}}>
+              <I n="description" size={20} cls="text-primary"/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:'var(--foreground)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{picked.name}</div>
+              <div style={{fontSize:11,color:'var(--muted-foreground)'}}>{formatBytes(picked.size)}</div>
+            </div>
+            <button type="button" onClick={()=>{setPicked(null);setError("");}} aria-label="Cancel" style={{background:'none',border:'none',cursor:'pointer'}}>
+              <I n="close" size={18} cls="text-muted-foreground"/>
+            </button>
+          </div>
+
+          <label style={{display:'flex',flexDirection:'column',gap:6}}>
+            <span style={{fontSize:12,fontWeight:600,color:'var(--foreground)'}}>Title</span>
+            <input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Fridge warranty card"
+              style={{padding:'10px 14px',borderRadius:12,border:'1px solid var(--border)',background:'var(--background)',color:'var(--foreground)',fontSize:14,outline:'none'}}/>
+          </label>
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <label style={{display:'flex',flexDirection:'column',gap:6}}>
+              <span style={{fontSize:12,fontWeight:600,color:'var(--foreground)'}}>Date</span>
+              <input type="date" value={docDate} onChange={e=>setDocDate(e.target.value)}
+                style={{padding:'10px 14px',borderRadius:12,border:'1px solid var(--border)',background:'var(--background)',color:'var(--foreground)',fontSize:14,outline:'none'}}/>
+            </label>
+            <label style={{display:'flex',flexDirection:'column',gap:6}}>
+              <span style={{fontSize:12,fontWeight:600,color:'var(--foreground)'}}>Expiry / Warranty date</span>
+              <input type="date" value={expiryDate} onChange={e=>setExpiryDate(e.target.value)}
+                style={{padding:'10px 14px',borderRadius:12,border:'1px solid var(--border)',background:'var(--background)',color:'var(--foreground)',fontSize:14,outline:'none'}}/>
+            </label>
+          </div>
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <label style={{display:'flex',flexDirection:'column',gap:6}}>
+              <span style={{fontSize:12,fontWeight:600,color:'var(--foreground)'}}>ID / Reference number</span>
+              <input value={refId} onChange={e=>setRefId(e.target.value)} placeholder="e.g. Invoice or serial no."
+                style={{padding:'10px 14px',borderRadius:12,border:'1px solid var(--border)',background:'var(--background)',color:'var(--foreground)',fontSize:14,outline:'none'}}/>
+            </label>
+            <label style={{display:'flex',flexDirection:'column',gap:6}}>
+              <span style={{fontSize:12,fontWeight:600,color:'var(--foreground)'}}>Customer (optional)</span>
+              <input value={customer} onChange={e=>setCustomer(e.target.value)} placeholder="e.g. Client name"
+                style={{padding:'10px 14px',borderRadius:12,border:'1px solid var(--border)',background:'var(--background)',color:'var(--foreground)',fontSize:14,outline:'none'}}/>
+            </label>
+          </div>
+
+          <button type="submit" disabled={uploading} className="ripple" style={{marginTop:4,padding:'12px',borderRadius:14,border:'none',background:'var(--primary)',color:'var(--primary-foreground)',fontWeight:600,fontSize:14,cursor:uploading?'default':'pointer',opacity:uploading?0.7:1}}>
+            {uploading?"Uploading…":"Save & Upload"}
+          </button>
+        </form>}
+
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
+          {[{icon:"photo_camera",label:"Camera",sub:"Take a photo now",color:"#4285F4",capture:"environment"},{icon:"document_scanner",label:"Scan Document",sub:"Multi-page scan",color:"#34A853",capture:"environment"},{icon:"upload",label:"From Files",sub:"Browse device",color:"#FBBC05"},{icon:"layers",label:"Google Drive",sub:"Import from cloud",color:"#EA4335"}].map(o=>(
+            <button key={o.label} className="ripple" onClick={()=>inputRef.current&&inputRef.current.click()} style={{background:'var(--card)',borderRadius:16,border:'1px solid var(--border)',padding:16,display:'flex',alignItems:'center',gap:12,cursor:'pointer',textAlign:'left',transition:'box-shadow .15s'}}>
+              <div style={{width:48,height:48,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,background:o.color+'15',color:o.color}}>
+                <I n={o.icon} size={24}/>
+              </div>
+              <div style={{minWidth:0}}>
+                <div style={{fontWeight:500,color:'var(--foreground)',fontSize:13}}>{o.label}</div>
+                <div style={{fontSize:11,color:'var(--muted-foreground)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.sub}</div>
+              </div>
+            </button>
+          ))}
+        </div>
         <div>
           <h2 style={{fontSize:15,fontWeight:600,color:'var(--foreground)',marginBottom:12}}>Recent Scans</h2>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -601,13 +531,10 @@
                   <I n="description" size={20} style={{color}}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.title}</div>
-                  <div style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--muted-foreground)',flexWrap:'wrap'}}>
-                    <span>{doc.size} · {doc.date}</span>
-                    <ExpiryBadge expiry={doc.expiry}/>
-                  </div>
+                  <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.title||doc.name}</div>
+                  <div style={{fontSize:11,color:'var(--muted-foreground)'}}>{doc.size} · {doc.date}</div>
                 </div>
-                <button className="ripple" onClick={()=>doc.url&&window.open(doc.url,"_blank","noopener")} aria-label={`Open ${doc.title}`} style={{width:36,height:36,borderRadius:12,background:'var(--muted)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
+                <button className="ripple" onClick={()=>doc.url&&window.open(doc.url,"_blank","noopener")} aria-label={`Open ${doc.name}`} style={{width:36,height:36,borderRadius:12,background:'var(--muted)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
                   <I n="visibility" size={16} cls="text-muted-foreground"/>
                 </button>
               </div>;
@@ -759,7 +686,7 @@
                   <I n="description" size={20} style={{color}}/><span style={{fontSize:9,fontWeight:700,color}}>{label}</span>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.name}</div>
+                  <div style={{fontSize:13,fontWeight:500,color:'var(--foreground)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.title||doc.name}</div>
                   <div style={{display:'flex',gap:8,fontSize:11,color:'var(--muted-foreground)',marginTop:2}}><span>{doc.cat}</span>{doc.customer&&<><span>·</span><span>{doc.customer}</span></>}</div>
                 </div>
                 <I n="chevron_right" size={15} cls="text-muted-foreground flex-shrink-0"/>
@@ -809,7 +736,7 @@ const rowStyle={width:'100%',display:'flex',alignItems:'center',justifyContent:'
 
     function BottomNav({cur,onNav}) {
       return <nav style={{position:'fixed',bottom:0,left:0,right:0,zIndex:50,backgroundColor:'var(--card)',borderTop:'1px solid var(--border)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)'}} className="lg:hidden">
-        <div className="safe-bottom" style={{display:'flex',alignItems:'center',justifyContent:'space-around',padding:'8px 8px 0'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-around',padding:'8px 8px 20px'}}>
           {NAV.map(({id,label,icon})=>{
             const active=cur===id;
             return <button key={id} onClick={()=>onNav(id)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,flex:1,background:'none',border:'none',cursor:'pointer',padding:0,transition:'all .15s'}}>
@@ -862,7 +789,7 @@ const rowStyle={width:'100%',display:'flex',alignItems:'center',justifyContent:'
 
     /* ── Loading ──────────────────────────────── */
     function FullScreenLoader({label}) {
-      return <div className="full-h" style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,background:'var(--background)',color:'var(--foreground)'}}>
+      return <div style={{height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,background:'var(--background)',color:'var(--foreground)'}}>
         <div style={{width:40,height:40,borderRadius:'50%',border:'3px solid var(--muted)',borderTopColor:'var(--primary)',animation:'spin 0.8s linear infinite'}}/>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         <div style={{fontSize:13,color:'var(--muted-foreground)'}}>{label}</div>
@@ -889,15 +816,14 @@ const rowStyle={width:'100%',display:'flex',alignItems:'center',justifyContent:'
             callback: (resp)=>onCredential(resp.credential),
           });
           if(btnRef.current){
-            const w=Math.min(280, Math.max(220, window.innerWidth-96));
-            window.google.accounts.id.renderButton(btnRef.current, { theme:"outline", size:"large", width:w, shape:"pill" });
+            window.google.accounts.id.renderButton(btnRef.current, { theme:"outline", size:"large", width:280, shape:"pill" });
           }
         }catch(err){
           console.error("Google Sign-In init failed:", err);
           setGsiError("Google Sign-In couldn't start — this page's URL likely isn't added under \"Authorized JavaScript origins\" for this Client ID (this also fails if you open the file directly instead of via http/https). See the browser console for details.");
         }
       },[]);
-      return <div className="full-h" style={{display:'flex',alignItems:'center',justifyContent:'center',background:'var(--background)',padding:24,overflowY:'auto'}}>
+      return <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--background)',padding:24}}>
         <div className="bg-card rounded-3xl border border-border page-enter" style={{padding:32,maxWidth:360,width:'100%',textAlign:'center'}}>
           <div style={{width:56,height:56,borderRadius:16,margin:'0 auto 16px',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--primary)'}}>
             <I n="description" size={26} style={{color:'#fff'}}/>
@@ -1009,7 +935,7 @@ const rowStyle={width:'100%',display:'flex',alignItems:'center',justifyContent:'
         profile:   <ProfileScreen dark={dark} setDark={setDark} user={user} onSignOut={handleSignOut}/>,
       };
 
-      return <div className={`full-h ${dark?"dark":""}`} style={{overflow:'hidden'}}>
+      return <div className={dark?"dark":""} style={{height:'100vh',overflow:'hidden'}}>
         <div style={{height:'100%',display:'flex',overflow:'hidden',background:'var(--background)',color:'var(--foreground)',fontFamily:'Inter,system-ui,sans-serif'}}>
           <Sidebar cur={screen} onNav={setScreen} user={user}/>
           <div ref={mainRef} style={{flex:1,display:'flex',flexDirection:'column',minHeight:0,transition:'margin-left .3s'}}>
@@ -1043,7 +969,7 @@ const rowStyle={width:'100%',display:'flex',alignItems:'center',justifyContent:'
 
           {/* FAB */}
           {showFAB&&<button onClick={()=>setScreen("scan")} className="ripple lg:hidden"
-            style={{position:'fixed',bottom:'calc(88px + env(safe-area-inset-bottom))',right:16,zIndex:50,width:56,height:56,borderRadius:16,background:'var(--primary)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(66,133,244,.45)',transition:'transform .15s, box-shadow .15s'}}
+            style={{position:'fixed',bottom:88,right:16,zIndex:50,width:56,height:56,borderRadius:16,background:'var(--primary)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(66,133,244,.45)',transition:'transform .15s, box-shadow .15s'}}
             onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.07)';e.currentTarget.style.boxShadow='0 12px 32px rgba(66,133,244,.55)';}}
             onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 8px 24px rgba(66,133,244,.45)';}}>
             <I n="add" size={26} style={{color:'white'}}/>
@@ -1061,7 +987,7 @@ const rowStyle={width:'100%',display:'flex',alignItems:'center',justifyContent:'
       componentDidCatch(err,info){ console.error("DocKeep crashed:", err, info); }
       render(){
         if(this.state.err){
-          return <div className="full-h" style={{display:'flex',alignItems:'center',justifyContent:'center',padding:24,fontFamily:'Inter,system-ui,sans-serif',background:'#F3F6FE'}}>
+          return <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:24,fontFamily:'Inter,system-ui,sans-serif',background:'#F3F6FE'}}>
             <div style={{maxWidth:420,textAlign:'center'}}>
               <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
               <h2 style={{color:'#1A1C26',margin:'0 0 8px'}}>Something went wrong</h2>
